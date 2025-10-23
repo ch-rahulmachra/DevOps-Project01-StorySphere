@@ -10,7 +10,7 @@ export default function Footer(){
       alert('Thanks for your feedback!');
       setEmail(''); setMessage('');
     } catch (err) {
-      alert('Failed to send feedback');
+      alert('Failed to send feedback!');
     }
   };
   return (
