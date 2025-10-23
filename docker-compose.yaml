@@ -1,0 +1,53 @@
+version: "3.9"
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: storysphere-mysql-app
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testDB
+      MYSQL_USER: tempuser
+      MYSQL_PASSWORD: changepwd
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: storysphere-back-image
+    container_name: storysphere-back-app
+    ports:
+      - 80:80
+    env_file:
+      - ./server/backend-var.env
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    depends_on:
+      - mysql
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    image: storysphere-front-image
+    container_name: storysphere-front-app
+    ports:
+      - 3000:3000
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
