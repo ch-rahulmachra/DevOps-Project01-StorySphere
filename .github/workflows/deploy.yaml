@@ -1,0 +1,51 @@
+name: ProdAction
+on: workflow_dispatch
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Get code
+              uses: actions/checkout@v4
+            - name: Cache dependencies
+              uses: actions/cache@v4
+              with:
+                path: ~/.npm
+                key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+            - name: Install dependencies
+              run: npm ci
+            - name: Test code
+              run: npm run test
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Get code
+              uses: actions/checkout@v4
+            - name: Cache dependencies
+              uses: actions/cache@v4
+              with:
+                path: ~/.npm
+                key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+            - name: Install dependencies
+              run: npm ci
+            - name: Test code
+              run: npm run test
+            - name: Build website
+              run: npm run build
+            - name: Upload artifacts
+              uses: actions/upload-artifact@v3
+              with:
+                name: dist-files
+                path: dist
+                # path: |
+                #   dist
+                #   package.json
+    deploy:
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+        - name: Get build artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: dist-files
+        - name: Deploy
+          run: echo "Deploying..."
