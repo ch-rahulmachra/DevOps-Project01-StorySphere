@@ -11,7 +11,11 @@ jobs:
               with:
                 path: ~/.npm
                 key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
-            - name: Install dependencies
+            - name: Install backend dependencies
+              working-directory: ./server
+              run: npm install
+            - name: Install frontend dependencies
+              working-directory: ./client
               run: npm install
             - name: Test code
               run: npm run test
@@ -26,7 +30,11 @@ jobs:
               with:
                 path: ~/.npm
                 key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
-            - name: Install dependencies
+            - name: Install backend dependencies
+              working-directory: ./server
+              run: npm install
+            - name: Install frontend dependencies
+              working-directory: ./client
               run: npm install
             - name: Test code
               run: npm run test
