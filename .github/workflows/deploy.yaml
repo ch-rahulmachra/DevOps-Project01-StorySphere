@@ -16,6 +16,7 @@ jobs:
             - name: Test code
               run: npm run test
     build:
+        needs: test
         runs-on: ubuntu-latest
         steps:
             - name: Get code
@@ -26,7 +27,7 @@ jobs:
                 path: ~/.npm
                 key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
             - name: Install dependencies
-              run: npm ci
+              run: npm install
             - name: Test code
               run: npm run test
             - name: Build website
