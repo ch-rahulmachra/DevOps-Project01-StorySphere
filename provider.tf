@@ -6,13 +6,13 @@ terraform {
         }
     }
     backend "s3" {
-        bucket = "SS-StateFile"
-        key    = "DevOps-Project/StorySphere/"
+        bucket = "storysphere-project-statefile"
+        key    = "Terraform/Backend"
         region = "ap-south-1"
         use_lockfile = true
     }
 }
 
 provider "aws" {
-  region = "ap-south-1"
+    region = "ap-south-1"
 }
