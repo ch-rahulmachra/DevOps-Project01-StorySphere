@@ -1,60 +1,144 @@
 name: ProdAction
 on: workflow_dispatch
 jobs:
-    test:
+    checkout:
         runs-on: ubuntu-latest
         steps:
             - name: Get code
               uses: actions/checkout@v4
-            - name: Cache dependencies
-              uses: actions/cache@v4
+            - name: Verify repo structure
+              run: |
+                echo "Repository contents:"
+                ls -R
+            - name: Upload source code
+              uses: actions/upload-artifact@v4
               with:
-                path: ~/.npm
-                key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
-            - name: Install backend dependencies
-              working-directory: ./server
-              run: npm install
-            - name: Install frontend dependencies
-              working-directory: ./client
-              run: npm install
-            - name: Test code
-              run: npm run test
+                name: source-code
+                path: .
     build:
-        needs: test
+        needs: checkout
         runs-on: ubuntu-latest
         steps:
-            - name: Get code
-              uses: actions/checkout@v4
-            - name: Cache dependencies
-              uses: actions/cache@v4
+            - name: Download source code
+              uses: actions/download-artifact@v4
               with:
-                path: ~/.npm
-                key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
-            - name: Install backend dependencies
-              working-directory: ./server
-              run: npm install
-            - name: Install frontend dependencies
-              working-directory: ./client
-              run: npm install
-            - name: Test code
-              run: npm run test
-            - name: Build website
-              run: npm run build
-            - name: Upload artifacts
-              uses: actions/upload-artifact@v3
+                name: source-code
+                path: .
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+            - name: Log in to Docker Hub
+              uses: docker/login-action@v3
               with:
-                name: dist-files
-                path: dist
-                # path: |
-                #   dist
-                #   package.json
-    deploy:
+                username: ${{ secrets.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+            - name: Build Backend Image
+              run: |
+                docker build -t ${{ env.BACK_IMAGE }}:latest -f ./server/Dockerfile ./server
+            - name: Build Frontend Image
+              run: |
+                docker build -t ${{ env.FRONT_IMAGE }}:latest -f ./client/Dockerfile ./client
+            - name: Verify built images
+              run: docker images
+
+            - name: Save backend image
+              run: docker save ${{ env.BACK_IMAGE }}:latest -o backend.tar
+            - name: Save frontend image
+              run: docker save ${{ env.FRONT_IMAGE }}:latest -o frontend.tar
+            
+            - name: Upload built images
+              uses: actions/upload-artifact@v4
+              with:
+                name: built-images
+                path: |
+                  backend.tar
+                  frontend.tar
+    test:
         needs: build
         runs-on: ubuntu-latest
         steps:
-        - name: Get build artifacts
-          uses: actions/download-artifact@v3
-          with:
-            name: dist-files
-        - name: Deploy
-          run: echo "Deploying..."
+            - name: Download built images
+              uses: actions/download-artifact@v4
+              with:
+                name: built-images
+                path: .
+
+            - name: Load Docker images
+              run: |
+                docker load -i backend.tar
+                docker load -i frontend.tar
+                docker images
+            
+            - name: Run backend container
+              run: docker run -d --name backend -p 5000:5000 storysphere-backend:latest
+
+            - name: Run frontend container
+              run: docker run -d --name frontend -p 3000:3000 storysphere-frontend:latest
+
+            - name: Test backend health
+              run: |
+                echo "Waiting for backend to start..."
+                sleep 10
+                curl -f http://localhost:5000/api/health || (echo "❌ Backend health check failed!" && exit 1)
+
+            - name: Test frontend accessibility
+              run: |
+                echo "Waiting for frontend to start..."
+                sleep 10
+                curl -f http://localhost:3000 || (echo "❌ Frontend not responding!" && exit 1)
+
+            - name: Stop and remove containers
+              if: always()
+              run: |
+                docker ps -a
+                docker stop frontend backend || true
+                docker rm frontend backend || true
+    push:
+        needs: test
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Log in to Docker Hub
+              uses: docker/login-action@v3
+              with:
+                username: ${{ secrets.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build and push Backend Docker image
+              uses: docker/build-push-action@v6
+              with:
+                context: ./server
+                file: ./server/Dockerfile
+                push: true
+                tags: |
+                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend:latest
+                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend:${{ github.run_number }}
+
+            - name: Build and push Frontend Docker image
+              uses: docker/build-push-action@v6
+              with:
+                context: ./client
+                file: ./client/Dockerfile
+                push: true
+                tags: |
+                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend:latest
+                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend:${{ github.run_number }}
+
+            - name: Verify pushed images
+              run: |
+                echo "✅ Checking Docker Hub images..."
+                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend:latest
+                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend:latest
+                docker images | grep storysphere
+
+    # deploy:
+    #     needs: push
+    #     runs-on: ubuntu-latest
+    #     steps:
+        
