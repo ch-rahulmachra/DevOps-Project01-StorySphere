@@ -117,8 +117,8 @@ jobs:
                 file: ./server/Dockerfile
                 push: true
                 tags: |
-                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend:latest
-                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend:${{ github.run_number }}
+                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:latest
+                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:${{ github.run_number }}
 
             - name: Build and push Frontend Docker image
               uses: docker/build-push-action@v6
@@ -127,14 +127,14 @@ jobs:
                 file: ./client/Dockerfile
                 push: true
                 tags: |
-                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend:latest
-                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend:${{ github.run_number }}
+                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest
+                  ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:${{ github.run_number }}
 
             - name: Verify pushed images
               run: |
-                echo "✅ Checking Docker Hub images..."
-                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend:latest
-                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend:latest
+                echo "Checking Docker Hub images..."
+                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:latest
+                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest
                 docker images | grep storysphere
 
     # deploy:

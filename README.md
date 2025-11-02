@@ -5,16 +5,5 @@ This archive contains a minimal full-stack StorySphere app:
 - client/ : React app (React Router, Axios)
 
 Quick start:
-
-1. Backend
-   - cd server
-   - cp .env.example .env   (edit DB credentials and JWT_SECRET)
-   - npm install
-   - npm run dev
-
-2. Frontend
-   - cd client
-   - npm install
-   - npm start
-
-Note: You must have MySQL running and provide DB credentials in server/.env
+Run:- 'docker-compose up'
+Note: You must have Docker installed and running in you system.
