@@ -1,20 +1,6 @@
 name: ProdAction
 on: workflow_dispatch
 jobs:
-    checkout:
-        runs-on: self-hosted
-        steps:
-            - name: Get code
-              uses: actions/checkout@v4
-            - name: Verify repo structure
-              run: |
-                echo "Repository contents:"
-                ls -R
-            # - name: Upload source code
-            #   uses: actions/upload-artifact@v4
-            #   with:
-            #     name: source-code
-            #     path: .
     leakscan:
         needs: checkout
         runs-on: self-hosted
@@ -41,9 +27,24 @@ jobs:
             with:
               scan-type: 'fs'
               scan-ref: './server'
+    checkout:
+        runs-on: self-hosted
+        steps:
+            - name: Get code
+              uses: actions/checkout@v4
+            - name: Verify repo structure
+              run: |
+                echo "Repository contents:"
+                ls -R
+            - name: Upload source code
+              uses: actions/upload-artifact@v4
+              with:
+                name: source-code
+                path: .
     build:
         needs: trivyfs
         runs-on: self-hosted
+        environment: Docker Credentials
         steps:
             - name: Download source code
               uses: actions/download-artifact@v4
@@ -123,6 +124,7 @@ jobs:
     push:
         needs: test
         runs-on: self-hosted
+        environment: Docker Credentials
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
