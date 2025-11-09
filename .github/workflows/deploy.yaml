@@ -35,12 +35,12 @@ jobs:
             uses: aquasecurity/trivy-action@0.28.0
             with:
               scan-type: 'fs'
-              scan-ref: '/client'
+              scan-ref: './client'
           - name: Run Trivy vulnerability scanner in fs mode for backend
             uses: aquasecurity/trivy-action@0.28.0
             with:
               scan-type: 'fs'
-              scan-ref: '/server'
+              scan-ref: './server'
     build:
         needs: trivyfs
         runs-on: self-hosted
