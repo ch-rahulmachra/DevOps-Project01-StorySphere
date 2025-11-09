@@ -2,7 +2,7 @@ name: ProdAction
 on: workflow_dispatch
 jobs:
     checkout:
-        runs-on: ubuntu-latest
+        runs-on: self-hosted
         steps:
             - name: Get code
               uses: actions/checkout@v4
@@ -10,14 +10,38 @@ jobs:
               run: |
                 echo "Repository contents:"
                 ls -R
-            - name: Upload source code
-              uses: actions/upload-artifact@v4
-              with:
-                name: source-code
-                path: .
+            # - name: Upload source code
+            #   uses: actions/upload-artifact@v4
+            #   with:
+            #     name: source-code
+            #     path: .
+    leakscan:
+        runs-on: self-hosted
+        steps:
+          - name: Get code
+            uses: actions/checkout@v4
+          - uses: gitleaks/gitleaks-action@v2
+            env:
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}
+    trivyfs:
+        runs-on: self-hosted
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v4
+          - name: Run Trivy vulnerability scanner in fs mode for frontend
+            uses: aquasecurity/trivy-action@0.28.0
+            with:
+              scan-type: 'fs'
+              scan-ref: '../../client'
+          - name: Run Trivy vulnerability scanner in fs mode for backend
+            uses: aquasecurity/trivy-action@0.28.0
+            with:
+              scan-type: 'fs'
+              scan-ref: '../../server'
     build:
         needs: checkout
-        runs-on: ubuntu-latest
+        runs-on: self-hosted
         steps:
             - name: Download source code
               uses: actions/download-artifact@v4
@@ -56,7 +80,7 @@ jobs:
                   frontend.tar
     test:
         needs: build
-        runs-on: ubuntu-latest
+        runs-on: self-hosted
         steps:
             - name: Download built images
               uses: actions/download-artifact@v4
@@ -96,7 +120,7 @@ jobs:
                 docker rm frontend backend || true
     push:
         needs: test
-        runs-on: ubuntu-latest
+        runs-on: self-hosted
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
