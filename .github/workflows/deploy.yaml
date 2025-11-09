@@ -45,6 +45,9 @@ jobs:
         needs: checkout
         runs-on: self-hosted
         environment: Docker Credentials
+        env:
+          BACK_IMAGE: temp_server_image
+          FRONT_IMAGE: temp_client_image
         steps:
             - name: Download source code
               uses: actions/download-artifact@v4
@@ -59,7 +62,7 @@ jobs:
               with:
                 username: ${{ secrets.DOCKERHUB_USERNAME }}
                 password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+              
             - name: Build Backend Image
               run: |
                 docker build -t ${{ env.BACK_IMAGE }}:latest -f ./server/Dockerfile ./server
