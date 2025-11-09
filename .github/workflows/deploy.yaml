@@ -16,6 +16,7 @@ jobs:
             #     name: source-code
             #     path: .
     leakscan:
+        needs: checkout
         runs-on: self-hosted
         steps:
           - name: Get code
@@ -25,6 +26,7 @@ jobs:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}
     trivyfs:
+        needs: leakscan
         runs-on: self-hosted
         steps:
           - name: Checkout code
@@ -33,14 +35,14 @@ jobs:
             uses: aquasecurity/trivy-action@0.28.0
             with:
               scan-type: 'fs'
-              scan-ref: '../../client'
+              scan-ref: '/client'
           - name: Run Trivy vulnerability scanner in fs mode for backend
             uses: aquasecurity/trivy-action@0.28.0
             with:
               scan-type: 'fs'
-              scan-ref: '../../server'
+              scan-ref: '/server'
     build:
-        needs: checkout
+        needs: trivyfs
         runs-on: self-hosted
         steps:
             - name: Download source code
