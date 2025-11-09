@@ -2,7 +2,6 @@ name: ProdAction
 on: workflow_dispatch
 jobs:
     leakscan:
-        needs: checkout
         runs-on: self-hosted
         steps:
           - name: Get code
@@ -29,6 +28,7 @@ jobs:
               scan-ref: './server'
     checkout:
         runs-on: self-hosted
+        needs: trivyfs
         steps:
             - name: Get code
               uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
                 name: source-code
                 path: .
     build:
-        needs: trivyfs
+        needs: checkout
         runs-on: self-hosted
         environment: Docker Credentials
         steps:
@@ -81,8 +81,42 @@ jobs:
                 path: |
                   backend.tar
                   frontend.tar
-    test:
+    trivyimage:
         needs: build
+        runs-on: self-hosted
+        steps:
+            - name: Download built images
+              uses: actions/download-artifact@v4
+              with:
+                name: built-images
+                path: .
+
+            - name: Load Docker images
+              run: |
+                docker load -i backend.tar
+                docker load -i frontend.tar
+                docker images
+
+            - name: Run Trivy vulnerability scanner for backend image
+              uses: aquasecurity/trivy-action@0.28.0
+              with:
+                image-ref: '${{ env.BACK_IMAGE }}'
+                format: 'table'
+                exit-code: '1'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+            - name: Run Trivy vulnerability scanner for frontend image
+              uses: aquasecurity/trivy-action@0.28.0
+              with:
+                image-ref: '${{ env.FRONT_IMAGE }}'
+                format: 'table'
+                exit-code: '1'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+    test:
+        needs: trivyimage
         runs-on: self-hosted
         steps:
             - name: Download built images
