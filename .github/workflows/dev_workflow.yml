@@ -113,7 +113,10 @@ jobs:
               run: |
                 cd docker_image
                 docker images
-            
+
+            - name: Run mysql container
+              run: docker run -d --name mysql -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=testDB -e MYSQL_USER=tempuser -e MYSQL_PASSWORD=changepwd -p 3306:3306 mysql
+
             - name: Run backend container
               run: docker run -d --name backend -p 5000:5000 ${{ env.BACK_IMAGE }}
 
