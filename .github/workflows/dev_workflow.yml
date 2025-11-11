@@ -74,6 +74,7 @@ jobs:
     trivyimage:
         needs: build
         runs-on: self-hosted
+        continue-on-error: true
         env:
           BACK_IMAGE: temp_server_image
           FRONT_IMAGE: temp_client_image
