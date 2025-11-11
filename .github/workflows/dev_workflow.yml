@@ -64,11 +64,11 @@ jobs:
               run: |
                 mkdir docker_image
                 cd docker_image
-                docker build -t ${{ env.BACK_IMAGE }}:latest -f ../server/Dockerfile ./server
+                docker build -t ${{ env.BACK_IMAGE }}:latest -f ../server/Dockerfile ../server
             - name: Build Frontend Image
               run: |
                 cd docker_image
-                docker build -t ${{ env.FRONT_IMAGE }}:latest -f ../client/Dockerfile ./client
+                docker build -t ${{ env.FRONT_IMAGE }}:latest -f ../client/Dockerfile ../client
             - name: Verify built images
               run: docker images
     trivyimage:
