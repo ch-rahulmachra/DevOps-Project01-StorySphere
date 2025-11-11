@@ -1,4 +1,4 @@
-name: ProdAction
+name: Production Workflow
 on: workflow_dispatch
 jobs:
     leakscan:
