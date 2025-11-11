@@ -105,6 +105,9 @@ jobs:
     test:
         needs: trivyimage
         runs-on: self-hosted
+        env:
+          BACK_IMAGE: temp_server_image
+          FRONT_IMAGE: temp_client_image
         steps:
             - name: Load Docker images
               run: |
