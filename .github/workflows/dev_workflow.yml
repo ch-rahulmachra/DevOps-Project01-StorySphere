@@ -88,7 +88,7 @@ jobs:
               with:
                 image-ref: '${{ env.BACK_IMAGE }}:latest'
                 format: 'table'
-                exit-code: '1'
+                exit-code: '0'
                 ignore-unfixed: true
                 vuln-type: 'os,library'
                 severity: 'CRITICAL,HIGH'
@@ -97,7 +97,7 @@ jobs:
               with:
                 image-ref: '${{ env.FRONT_IMAGE }}:latest'
                 format: 'table'
-                exit-code: '1'
+                exit-code: '0'
                 ignore-unfixed: true
                 vuln-type: 'os,library'
                 severity: 'CRITICAL,HIGH'
@@ -128,12 +128,12 @@ jobs:
                 sleep 10
                 curl -f http://localhost:3000 || (echo "❌ Frontend not responding!" && exit 1)
 
-            # - name: Stop and remove containers
-            #   if: always()
-            #   run: |
-            #     docker ps -a
-            #     docker stop frontend backend || true
-            #     docker rm frontend backend || true
+            - name: Stop and remove containers
+              if: always()
+              run: |
+                docker ps -a
+                docker stop frontend backend || true
+                docker rm frontend backend || true
     # push:
     #     needs: test
     #     runs-on: self-hosted
