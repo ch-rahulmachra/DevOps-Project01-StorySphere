@@ -5,3 +5,7 @@ variable "subnets" {
 # variable "route_tables" {
 #   type = map(list(string))
 # }
+
+variable "vpc_cidr" {
+  type = string
+}

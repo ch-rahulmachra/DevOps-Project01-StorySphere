@@ -16,4 +16,13 @@ module "vpc" {
 
     subnets      = var.subnets
     route_tables = local.route_tables
+    vpc_cidr = var.vpc_cidr
+}
+
+module "runner" {
+    source = "./Modules/Runner_JumpHost"
+    subnet_id = module.vpc.private_subnet_ids[0]
+    volume_size = 20
+    vpc_id = module.vpc.vpc_id
+    vpc_cidr = var.vpc_cidr
 }

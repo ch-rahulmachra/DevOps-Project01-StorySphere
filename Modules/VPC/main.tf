@@ -1,5 +1,5 @@
 resource "aws_vpc" "ss_vpc" {
-    cidr_block = "10.0.0.0/24"
+    cidr_block = var.vpc_cidr
     tags = {
         Name = "StorySphere-VPC"
     }
