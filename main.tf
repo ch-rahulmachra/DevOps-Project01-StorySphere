@@ -25,4 +25,6 @@ module "runner" {
     volume_size = 20
     vpc_id = module.vpc.vpc_id
     vpc_cidr = var.vpc_cidr
+    bastion_volume_size = 8
+    bastion_subnet_id = module.vpc.public_subnet_ids[0]
 }
