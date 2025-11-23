@@ -15,11 +15,21 @@ const sequelize = new Sequelize(
   }
 );
 
-try {
-  await sequelize.authenticate();
-  console.log('✅ Connected to MySQL successfully');
-} catch (error) {
-  console.error('❌ Unable to connect to the database:', error);
+async function connectWithRetry(retries = 10, delay = 2000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await sequelize.authenticate();
+      console.log('✅ Connected to MySQL successfully');
+      return;
+    } catch (err) {
+      console.log(`❌ Unable to connect. Retrying in ${delay / 1000}s...`);
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+  console.error('❌ Could not connect to MySQL after multiple attempts.');
 }
+
+await connectWithRetry();
+
 
 export { sequelize };
