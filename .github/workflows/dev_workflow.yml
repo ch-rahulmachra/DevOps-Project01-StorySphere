@@ -127,8 +127,11 @@ jobs:
               run: docker images
 
             - name: Create network
-              run: docker network create tempnet
-
+              run: |
+                    if ! docker network ls | grep -q "tempnet"; then
+                      docker network create tempnet
+                    fi
+        
             - name: Run mysql container
               run: docker run -d --name mysql --restart always --network tempnet -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=testDB -e MYSQL_USER=tempuser -e MYSQL_PASSWORD=changepwd -p 3306:3306 mysql:8.0
 
