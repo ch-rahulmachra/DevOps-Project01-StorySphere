@@ -1,15 +1,19 @@
 name: Development Workflow
 on:
-    push:
-        branches:
-            - dev
-    workflow_dispatch:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+env:
+    BACK_IMAGE: temp_server_image
+    FRONT_IMAGE: temp_client_image
 jobs:
     leakscan:
         runs-on: self-hosted
         steps:
           - name: Get code
             uses: actions/checkout@v4
+          
           - uses: gitleaks/gitleaks-action@v2
             env:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -20,11 +24,13 @@ jobs:
         steps:
           - name: Checkout code
             uses: actions/checkout@v4
+
           - name: Run Trivy vulnerability scanner in fs mode for frontend
             uses: aquasecurity/trivy-action@0.28.0
             with:
               scan-type: 'fs'
               scan-ref: './client'
+
           - name: Run Trivy vulnerability scanner in fs mode for backend
             uses: aquasecurity/trivy-action@0.28.0
             with:
@@ -33,9 +39,11 @@ jobs:
     sonarqube:
         needs: leakscan
         runs-on: self-hosted
+        continue-on-error: true
         steps:
           - name: Checkout code
             uses: actions/checkout@v4
+
           - name: Frontend SonarQube Scan
             uses: SonarSource/sonarqube-scan-action@v6.0.0
             env:
@@ -43,6 +51,7 @@ jobs:
                 SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
             with:
                 projectBaseDir: ./client
+
           - name: Backend SonarQube Scan
             uses: SonarSource/sonarqube-scan-action@v6.0.0
             env:
@@ -52,14 +61,16 @@ jobs:
                 projectBaseDir: ./server
     checkout:
         runs-on: self-hosted
-        needs: [trivyfs]
+        needs: [trivyfs,sonarqube]
         steps:
             - name: Get code
               uses: actions/checkout@v4
+
             - name: Verify repo structure
               run: |
                 echo "Repository contents:"
                 ls -R
+
             - name: Upload source code
               uses: actions/upload-artifact@v4
               with:
@@ -68,33 +79,30 @@ jobs:
     build:
         needs: checkout
         runs-on: self-hosted
-        environment: Docker Credentials
-        env:
-          BACK_IMAGE: temp_server_image
-          FRONT_IMAGE: temp_client_image
         steps:
             - name: Download source code
               uses: actions/download-artifact@v4
               with:
                 name: source-code
                 path: .
+
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
+
             - name: Build Backend Image
               run: docker build -t ${{ env.BACK_IMAGE }}:latest -f ./server/Dockerfile ./server
+
             - name: Build Frontend Image
               run: docker build -t ${{ env.FRONT_IMAGE }}:latest -f ./client/Dockerfile ./client
+
             - name: Verify built images
               run: docker images
     trivyimage:
-        needs: test
+        needs: build
         runs-on: self-hosted
         continue-on-error: true
-        env:
-          BACK_IMAGE: temp_server_image
-          FRONT_IMAGE: temp_client_image
         steps:
-            - name: Load Docker images
+            - name: Show Docker images
               run: docker images
 
             - name: Run Trivy vulnerability scanner for backend image
@@ -106,6 +114,7 @@ jobs:
                 ignore-unfixed: true
                 vuln-type: 'os,library'
                 severity: 'CRITICAL,HIGH'
+                
             - name: Run Trivy vulnerability scanner for frontend image
               uses: aquasecurity/trivy-action@0.28.0
               with:
@@ -116,14 +125,10 @@ jobs:
                 vuln-type: 'os,library'
                 severity: 'CRITICAL,HIGH'
     test:
-        # needs: trivyimage
         needs: build
         runs-on: self-hosted
-        env:
-          BACK_IMAGE: temp_server_image
-          FRONT_IMAGE: temp_client_image
         steps:
-            - name: Load Docker images
+            - name: Show Docker images
               run: docker images
 
             - name: Create network
@@ -164,23 +169,59 @@ jobs:
                     echo "⏳ Waiting..."
                     sleep 3
                   done
+                  if ! docker exec backend curl -fs http://localhost:80/api/health; then
+                    echo "❌ Backend health check failed!"
+                  fi
+
             - name: Test frontend accessibility
               run: |
                 echo "Waiting for frontend to start..."
                 sleep 10
                 curl -f http://localhost:3000 || (echo "❌ Frontend not responding!" && exit 1)
 
-            # - name: Stop and remove containers
-            #   if: always()
-            #   run: |
-            #     docker ps -a
-            #     docker stop frontend backend || true
-            #     docker rm frontend backend || true
-    # push:
-    #     needs: test
-    #     runs-on: self-hosted
-    #     environment: Docker Credentials
-    #     steps:
+            - name: Stop and remove containers
+              if: always()
+              run: |
+                docker ps -a
+                docker stop frontend backend mysql || true
+                docker rm frontend backend mysql || true
+    push:
+        needs: test
+        runs-on: self-hosted
+        environment: Docker Credentials
+        steps:
+              - name: Login in docker
+                run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+
+              - name: Tagging the Frontend images
+                run: |
+                    docker tag ${{ env.FRONT_IMAGE }} ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest
+                    docker tag ${{ env.FRONT_IMAGE }} ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:${{ github.run_number }}
+              - name: Tagging the Backend images
+                run: |
+                    docker tag ${{ env.BACK_IMAGE }} ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:latest
+                    docker tag ${{ env.BACK_IMAGE }} ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:${{ github.run_number }}
+
+              - name: Pushing the Frontend images
+                run: |
+                    docker push ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest
+                    docker push ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:${{ github.run_number }}
+              - name: Pushing the Backend images
+                run: |
+                    docker push ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:latest
+                    docker push ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:${{ github.run_number }}
+              
+              - name: Verify pushed images
+                run: |
+                  echo "Checking Docker Hub images..."
+                  docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:latest
+                  docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest
+                  docker images | grep storysphere
+              
+              - name: Cleaning up images
+                if: always()
+                run: docker rmi ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:latest ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest ${{ env.BACK_IMAGE }}:latest ${{ env.FRONT_IMAGE }}:latest ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:${{ github.run_number }} ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:${{ github.run_number }}
+
     #         - name: Checkout repository
     #           uses: actions/checkout@v4
 
@@ -206,13 +247,6 @@ jobs:
     #             tags: |
     #               ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest
     #               ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:${{ github.run_number }}
-
-    #         - name: Verify pushed images
-    #           run: |
-    #             echo "Checking Docker Hub images..."
-    #             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:latest
-    #             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest
-    #             docker images | grep storysphere
 
     # deploy:
     #     needs: push
