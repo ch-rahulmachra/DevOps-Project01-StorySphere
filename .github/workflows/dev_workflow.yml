@@ -31,7 +31,7 @@ jobs:
               scan-type: 'fs'
               scan-ref: './server'
     sonarqube:
-        needs: trivyfs
+        needs: leakscan
         runs-on: self-hosted
         steps:
           - name: Checkout code
@@ -52,7 +52,7 @@ jobs:
                 projectBaseDir: ./server
     checkout:
         runs-on: self-hosted
-        needs: trivyfs
+        needs: [trivyfs]
         steps:
             - name: Get code
               uses: actions/checkout@v4
@@ -116,7 +116,7 @@ jobs:
                 vuln-type: 'os,library'
                 severity: 'CRITICAL,HIGH'
     test:
-        needs: trivyimage
+        # needs: trivyimage
         runs-on: self-hosted
         env:
           BACK_IMAGE: temp_server_image
