@@ -133,13 +133,25 @@ jobs:
                     fi
         
             - name: Run mysql container
-              run: docker run -d --name mysql --restart always --network tempnet -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=testDB -e MYSQL_USER=tempuser -e MYSQL_PASSWORD=changepwd -p 3306:3306 mysql:8.0
+              run: |
+                  if ! docker ps -a | grep "mysql"; then
+                    docker rm -f mysql
+                  fi
+                  docker run -d --name mysql --restart always --network tempnet -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=testDB -e MYSQL_USER=tempuser -e MYSQL_PASSWORD=changepwd -p 3306:3306 mysql:8.0
 
             - name: Run backend container
-              run: docker run -d --name backend --network tempnet -p 80:80 ${{ env.BACK_IMAGE }}
+              run: |
+                  if ! docker ps -a | grep "mysql"; then
+                    docker rm -f backend
+                  fi
+                  docker run -d --name backend --network tempnet -p 80:80 ${{ env.BACK_IMAGE }}
 
             - name: Run frontend container
-              run: docker run -d --name frontend -p 3000:3000 ${{ env.FRONT_IMAGE }}
+              run: |
+                  if ! docker ps -a | grep "mysql"; then
+                    docker rm -f frontend
+                  fi
+                  docker run -d --name frontend -p 3000:3000 ${{ env.FRONT_IMAGE }}
 
             - name: Test backend health
               run: |
