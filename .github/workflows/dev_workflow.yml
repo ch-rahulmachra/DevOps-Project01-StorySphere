@@ -39,6 +39,7 @@ jobs:
     sonarqube:
         needs: leakscan
         runs-on: self-hosted
+        environment: StorySphere credentials
         continue-on-error: true
         steps:
           - name: Checkout code
@@ -188,7 +189,7 @@ jobs:
     push:
         needs: test
         runs-on: self-hosted
-        environment: Docker Credentials
+        environment: StorySphere credentials
         steps:
               - name: Login in docker
                 run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
