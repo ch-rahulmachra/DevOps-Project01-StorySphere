@@ -117,6 +117,7 @@ jobs:
                 severity: 'CRITICAL,HIGH'
     test:
         # needs: trivyimage
+        needs: build
         runs-on: self-hosted
         env:
           BACK_IMAGE: temp_server_image
