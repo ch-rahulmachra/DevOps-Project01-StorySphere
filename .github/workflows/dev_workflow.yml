@@ -87,7 +87,7 @@ jobs:
             - name: Verify built images
               run: docker images
     trivyimage:
-        needs: build
+        needs: test
         runs-on: self-hosted
         continue-on-error: true
         env:
@@ -144,7 +144,7 @@ jobs:
                   if docker ps -a | grep "backend"; then
                     docker rm -f backend
                   fi
-                  docker run -d --name backend --network tempnet -p 80:80 ${{ env.BACK_IMAGE }}
+                  docker run -d --name backend --network tempnet -e PORT=80 -e DB_NAME=testDB -e DB_USER=tempuser -e DB_PASS=changepwd -e JWT_SECRET=supersecret -e DB_HOST=mysql -e DB_PORT=3306 -p 80:80 ${{ env.BACK_IMAGE }}
 
             - name: Run frontend container
               run: |
