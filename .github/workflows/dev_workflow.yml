@@ -81,9 +81,9 @@ jobs:
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
             - name: Build Backend Image
-              run: docker build -t ${{ env.BACK_IMAGE }}:latest -f ../server/Dockerfile ../server
+              run: docker build -t ${{ env.BACK_IMAGE }}:latest -f ./server/Dockerfile ./server
             - name: Build Frontend Image
-              run: docker build -t ${{ env.FRONT_IMAGE }}:latest -f ../client/Dockerfile ../client
+              run: docker build -t ${{ env.FRONT_IMAGE }}:latest -f ./client/Dockerfile ./client
             - name: Verify built images
               run: docker images
     trivyimage:
