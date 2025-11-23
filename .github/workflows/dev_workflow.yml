@@ -30,6 +30,26 @@ jobs:
             with:
               scan-type: 'fs'
               scan-ref: './server'
+    sonarqube:
+        needs: trivyfs
+        runs-on: self-hosted
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v4
+          - name: Frontend SonarQube Scan
+            uses: SonarSource/sonarqube-scan-action@v6.0.0
+            env:
+                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+                SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+            with:
+                projectBaseDir: ./client
+          - name: Backend SonarQube Scan
+            uses: SonarSource/sonarqube-scan-action@v6.0.0
+            env:
+                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+                SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+            with:
+                projectBaseDir: ./server
     checkout:
         runs-on: self-hosted
         needs: trivyfs
@@ -112,7 +132,7 @@ jobs:
               run: docker run -d --name mysql --restart always --network tempnet -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=testDB -e MYSQL_USER=tempuser -e MYSQL_PASSWORD=changepwd -p 3306:3306 mysql:8.0
 
             - name: Run backend container
-              run: docker run -d --name backend --network tempnet -p 5000:5000 ${{ env.BACK_IMAGE }}
+              run: docker run -d --name backend --network tempnet -p 80:80 ${{ env.BACK_IMAGE }}
 
             - name: Run frontend container
               run: docker run -d --name frontend -p 3000:3000 ${{ env.FRONT_IMAGE }}
@@ -129,12 +149,12 @@ jobs:
                 sleep 10
                 curl -f http://localhost:3000 || (echo "❌ Frontend not responding!" && exit 1)
 
-            - name: Stop and remove containers
-              if: always()
-              run: |
-                docker ps -a
-                docker stop frontend backend || true
-                docker rm frontend backend || true
+            # - name: Stop and remove containers
+            #   if: always()
+            #   run: |
+            #     docker ps -a
+            #     docker stop frontend backend || true
+            #     docker rm frontend backend || true
     # push:
     #     needs: test
     #     runs-on: self-hosted
