@@ -223,32 +223,6 @@ jobs:
                 if: always()
                 run: docker rmi ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:latest ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest ${{ env.BACK_IMAGE }}:latest ${{ env.FRONT_IMAGE }}:latest ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:${{ github.run_number }} ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:${{ github.run_number }}
 
-    #         - name: Checkout repository
-    #           uses: actions/checkout@v4
-
-    #         - name: Set up Docker Buildx
-    #           uses: docker/setup-buildx-action@v3
-
-    #         - name: Build and push Backend Docker image
-    #           uses: docker/build-push-action@v6
-    #           with:
-    #             context: ./server
-    #             file: ./server/Dockerfile
-    #             push: true
-    #             tags: |
-    #               ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:latest
-    #               ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-backend-image:${{ github.run_number }}
-
-    #         - name: Build and push Frontend Docker image
-    #           uses: docker/build-push-action@v6
-    #           with:
-    #             context: ./client
-    #             file: ./client/Dockerfile
-    #             push: true
-    #             tags: |
-    #               ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:latest
-    #               ${{ secrets.DOCKERHUB_USERNAME }}/storysphere-frontend-image:${{ github.run_number }}
-
     # deploy:
     #     needs: push
     #     runs-on: ubuntu-latest
