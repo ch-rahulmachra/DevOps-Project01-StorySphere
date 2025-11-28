@@ -3,19 +3,23 @@ services:
   mysql:
     image: mysql:8.0
     container_name: storysphere-mysql-app
-    restart: always
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: testDB
       MYSQL_USER: tempuser
       MYSQL_PASSWORD: changepwd
+    networks:
+      - storysphere-net
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
   adminer:
     image: adminer
-    restart: always
+    restart: unless-stopped
+    networks:
+      - storysphere-net
     ports:
       - "8080:8080"
     depends_on:
@@ -30,9 +34,11 @@ services:
       - 80:80
     env_file:
       - ./server/backend-var.env
-    volumes:
-      - ./server:/app
-      - /app/node_modules
+    networks:
+      - storysphere-net
+    # volumes:
+    #   - ./server:/app
+    #   - /app/node_modules
     depends_on:
       - mysql
   frontend:
@@ -43,6 +49,10 @@ services:
     container_name: storysphere-front-app
     ports:
       - 3000:3000
+    environment:
+      - REACT_APP_SERVER_URL=http://localhost:80/api
+    networks:
+      - storysphere-net
     volumes:
       - ./client:/app
       - /app/node_modules
@@ -51,3 +61,5 @@ services:
 
 volumes:
   mysql_data:
+networks:
+  storysphere-net:
