@@ -1,0 +1,274 @@
+name: Resuable Workflow(Prod)
+on:
+    workflow_call:
+        inputs:
+            BACK_IMAGE:
+                description: "Provide the name of backend image"
+                required: true
+                type: string
+                default: "temp_server_image"
+            FRONT_IMAGE:
+                description: "Provide the name of frontend image"
+                required: true
+                type: string
+                default: "temp_client_image"
+jobs:
+    detect-changes:
+        runs-on: self-hosted
+        outputs:
+            frontend: ${{ steps.filter.outputs.frontend }}
+            backend: ${{ steps.filter.outputs.backend }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+            - id: filter
+              uses: dorny/paths-filter@v3
+              with:
+                filters: |
+                  frontend:
+                    - 'client/**'
+                  backend:
+                    - 'server/**'
+    leakscan:
+        runs-on: self-hosted
+        steps:
+          - name: Get code
+            uses: actions/checkout@v4
+          
+          - uses: gitleaks/gitleaks-action@v2
+            env:
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}
+    trivyfs:
+        needs: [leakscan, detect-changes]
+        runs-on: self-hosted
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v4
+
+          - name: Run Trivy vulnerability scanner in fs mode for frontend
+            if: needs.detect-changes.outputs.frontend == 'true'
+            uses: aquasecurity/trivy-action@0.28.0
+            with:
+              scan-type: 'fs'
+              scan-ref: './client'
+
+          - name: Run Trivy vulnerability scanner in fs mode for backend
+            if: needs.detect-changes.outputs.backend == 'true'
+            uses: aquasecurity/trivy-action@0.28.0
+            with:
+              scan-type: 'fs'
+              scan-ref: './server'
+    sonarqube:
+        needs: [leakscan, detect-changes]
+        runs-on: self-hosted
+        environment: StorySphere credentials
+        continue-on-error: true
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v4
+
+          - name: Frontend SonarQube Scan
+            if: needs.detect-changes.outputs.frontend == 'true'
+            uses: SonarSource/sonarqube-scan-action@v6.0.0
+            env:
+                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+                SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+            with:
+                projectBaseDir: ./client
+
+          - name: Backend SonarQube Scan
+            if: needs.detect-changes.outputs.backend == 'true'
+            uses: SonarSource/sonarqube-scan-action@v6.0.0
+            env:
+                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+                SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+            with:
+                projectBaseDir: ./server
+    checkout:
+        runs-on: self-hosted
+        needs: [trivyfs,sonarqube]
+        steps:
+            - name: Get code
+              uses: actions/checkout@v4
+
+            - name: Verify repo structure
+              run: |
+                echo "Repository contents:"
+                ls -R
+
+            - name: Upload source code
+              uses: actions/upload-artifact@v4
+              with:
+                name: source-code
+                path: .
+    build:
+        needs: [checkout, detect-changes]
+        runs-on: self-hosted
+        steps:
+            - name: Download source code
+              uses: actions/download-artifact@v4
+              with:
+                name: source-code
+                path: .
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build Backend Image
+              if: needs.detect-changes.outputs.backend == 'true'
+              run: docker build -t ${{ inputs.BACK_IMAGE }}:latest -f ./server/Dockerfile ./server
+
+            - name: Build Frontend Image
+              if: needs.detect-changes.outputs.frontend == 'true'
+              run: docker build -t ${{ inputs.FRONT_IMAGE }}:latest -f ./client/Dockerfile ./client
+
+            - name: Verify built images
+              run: docker images
+    trivyimage:
+        needs: [build, detect-changes]
+        runs-on: self-hosted
+        continue-on-error: true
+        steps:
+            - name: Show Docker images
+              run: docker images
+
+            - name: Run Trivy vulnerability scanner for backend image
+              if: needs.detect-changes.outputs.backend == 'true'
+              uses: aquasecurity/trivy-action@0.28.0
+              with:
+                image-ref: '${{ inputs.BACK_IMAGE }}:latest'
+                format: 'table'
+                exit-code: '0'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+                
+            - name: Run Trivy vulnerability scanner for frontend image
+              if: needs.detect-changes.outputs.frontend == 'true'
+              uses: aquasecurity/trivy-action@0.28.0
+              with:
+                image-ref: '${{ inputs.FRONT_IMAGE }}:latest'
+                format: 'table'
+                exit-code: '0'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+    test:
+        needs: [build, detect-changes]
+        runs-on: self-hosted
+        steps:
+            - name: Show Docker images
+              run: docker images
+
+            - name: Create network
+              if: needs.detect-changes.outputs.backend == 'true'
+              run: |
+                    if ! docker network ls | grep -q "tempnet"; then
+                      docker network create tempnet
+                    fi
+        
+            - name: Run mysql container
+              if: needs.detect-changes.outputs.backend == 'true'
+              run: |
+                  if docker ps -a | grep "mysql"; then
+                    docker rm -f mysql
+                  fi
+                  docker run -d --name mysql --restart always --network tempnet -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=testDB -e MYSQL_USER=tempuser -e MYSQL_PASSWORD=changepwd -p 3306:3306 mysql:8.0
+
+            - name: Run backend container
+              if: needs.detect-changes.outputs.backend == 'true'
+              run: |
+                  if docker ps -a | grep "backend"; then
+                    docker rm -f backend
+                  fi
+                  docker run -d --name backend --network tempnet -e PORT=80 -e DB_NAME=testDB -e DB_USER=tempuser -e DB_PASS=changepwd -e JWT_SECRET=supersecret -e DB_HOST=mysql -e DB_PORT=3306 -p 80:80 ${{ inputs.BACK_IMAGE }}
+
+            - name: Run frontend container
+              if: needs.detect-changes.outputs.frontend == 'true'
+              run: |
+                  if docker ps -a | grep "frontend"; then
+                    docker rm -f frontend
+                  fi
+                  docker run -d --name frontend -p 3000:3000 ${{ inputs.FRONT_IMAGE }}
+
+            - name: Test backend health
+              if: needs.detect-changes.outputs.backend == 'true'
+              run: |
+                  echo "Waiting for backend to be ready..."
+                  for i in {1..20}; do
+                    if docker exec backend curl -fs http://localhost:80/api/health; then
+                      echo "✅ Backend is ready!"
+                      break
+                    fi
+                    echo "⏳ Waiting..."
+                    sleep 3
+                  done
+                  if ! docker exec backend curl -fs http://localhost:80/api/health; then
+                    echo "❌ Backend health check failed!"
+                  fi
+
+            - name: Test frontend accessibility
+              if: needs.detect-changes.outputs.frontend == 'true'
+              run: |
+                echo "Waiting for frontend to start..."
+                sleep 10
+                curl -f http://localhost:3000 || (echo "❌ Frontend not responding!" && exit 1)
+
+            - name: Stop and remove containers
+              if: always()
+              run: |
+                docker ps -a
+                docker stop frontend backend mysql || true
+                docker rm frontend backend mysql || true
+    push:
+        needs: [test, detect-changes]
+        runs-on: self-hosted
+        environment: StorySphere credentials
+        steps:
+              - name: Login in aws ecr
+                run: aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 802314158010.dkr.ecr.ap-south-1.amazonaws.com
+
+              - name: Tagging the Frontend images
+                if: needs.detect-changes.outputs.frontend == 'true'
+                run: |
+                    docker tag ${{ inputs.FRONT_IMAGE }} 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/frontend-app:latest
+                    docker tag ${{ inputs.FRONT_IMAGE }} 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/frontend-app:${{ github.run_number }}
+      
+              - name: Tagging the Backend images
+                if: needs.detect-changes.outputs.backend == 'true'
+                run: |
+                    docker tag ${{ inputs.BACK_IMAGE }} 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/backend-app:latest
+                    docker tag ${{ inputs.BACK_IMAGE }} 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/backend-app:${{ github.run_number }}
+        
+              - name: Pushing the Frontend images
+                if: needs.detect-changes.outputs.frontend == 'true'
+                run: |
+                    docker push 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/frontend-app:latest
+                    docker push 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/frontend-app:${{ github.run_number }}
+
+              - name: Pushing the Backend images
+                if: needs.detect-changes.outputs.backend == 'true'
+                run: |
+                    docker push 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/backend-app:latest
+                    docker push 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/backend-app:${{ github.run_number }}
+              
+              - name: Verify frontend image
+                run: |
+                  echo "Checking ECR Frontend Latest Image..."
+                  docker pull 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/frontend-app:latest
+                  docker images | grep storysphere
+              
+              - name: Verify backend image
+                run: |
+                  echo "Checking ECR Backend Latest Image..."
+                  docker pull 802314158010.dkr.ecr.ap-south-1.amazonaws.com/storysphere/backend-app:latest
+                  docker images | grep storysphere
+              
+              - name: Cleaning up images
+                if: always()
+                run: docker image prune
+    # deploy:
+    #     needs: push
+    #     runs-on: ubuntu-latest
+    #     steps:
