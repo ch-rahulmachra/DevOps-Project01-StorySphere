@@ -2,7 +2,7 @@ name: Production Workflow
 on:
   push:
     branches:
-      - prod
+      - main
     paths-ignore:
       - '.github/workflows/**'
   workflow_dispatch:

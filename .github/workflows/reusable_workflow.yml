@@ -46,12 +46,23 @@ jobs:
           - name: Checkout code
             uses: actions/checkout@v4
 
+          - name: Cache Trivy DB
+            uses: actions/cache@v4
+            with:
+              path: ~/.cache/trivy
+              key: trivy-image-db
+
           - name: Run Trivy vulnerability scanner in fs mode for frontend
             if: needs.detect-changes.outputs.frontend == 'true'
             uses: aquasecurity/trivy-action@0.28.0
             with:
               scan-type: 'fs'
               scan-ref: './client'
+              vuln-type: os,library
+              severity: CRITICAL,HIGH
+              ignore-unfixed: true
+              exit-code: 0
+              format: table
 
           - name: Run Trivy vulnerability scanner in fs mode for backend
             if: needs.detect-changes.outputs.backend == 'true'
@@ -59,6 +70,11 @@ jobs:
             with:
               scan-type: 'fs'
               scan-ref: './server'
+              vuln-type: os,library
+              severity: CRITICAL,HIGH
+              ignore-unfixed: true
+              exit-code: 0
+              format: table
     sonarqube:
         needs: [leakscan, detect-changes]
         runs-on: self-hosted
@@ -133,6 +149,12 @@ jobs:
             - name: Show Docker images
               run: docker images
 
+            - name: Cache Trivy DB
+              uses: actions/cache@v4
+              with:
+                path: ~/.cache/trivy
+                key: trivy-image-db
+
             - name: Run Trivy vulnerability scanner for backend image
               if: needs.detect-changes.outputs.backend == 'true'
               uses: aquasecurity/trivy-action@0.28.0
@@ -141,7 +163,7 @@ jobs:
                 format: 'table'
                 exit-code: '0'
                 ignore-unfixed: true
-                vuln-type: 'os,library'
+                scanners: vuln
                 severity: 'CRITICAL,HIGH'
                 
             - name: Run Trivy vulnerability scanner for frontend image
@@ -152,7 +174,7 @@ jobs:
                 format: 'table'
                 exit-code: '0'
                 ignore-unfixed: true
-                vuln-type: 'os,library'
+                scanners: vuln
                 severity: 'CRITICAL,HIGH'
     test:
         needs: [build, detect-changes]
@@ -267,7 +289,7 @@ jobs:
               
               - name: Cleaning up images
                 if: always()
-                run: docker image prune
+                run: docker image prune -af
     # deploy:
     #     needs: push
     #     runs-on: ubuntu-latest
