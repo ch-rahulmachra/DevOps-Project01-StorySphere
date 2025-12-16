@@ -18,7 +18,7 @@ export default function StoryDetail(){
       <p className="story-meta">By {story.User?.username}</p>
       <div className="story-content">{story.content}</div>
       <div className="mt-2">
-        <Link to="/">← Back to stories</Link>
+        <Link to="/">← Back to stories!</Link>
       </div>
     </div>
   );
