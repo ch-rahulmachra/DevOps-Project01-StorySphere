@@ -29,8 +29,15 @@ jobs:
                     - 'client/**'
                   backend:
                     - 'server/**'
+
+            - name: Stop workflow if no changes
+              if: ${{ steps.filter.outputs.frontend == 'false' && steps.filter.outputs.backend == 'false' }}
+              run: |
+                echo "No frontend or backend changes detected. Cancelling workflow."
+                exit 0
     leakscan:
         runs-on: self-hosted
+        needs: detect-changes
         steps:
           - name: Get code
             uses: actions/checkout@v4
@@ -52,7 +59,7 @@ jobs:
           - name: Cache Trivy DB
             uses: actions/cache@v4
             with:
-              path: ~/.cache/trivy
+              path: ${{ github.workspace }}/.trivy-cache
               key: trivy-image-db
 
           - name: Run Trivy vulnerability scanner in fs mode for frontend
@@ -160,7 +167,7 @@ jobs:
             - name: Cache Trivy DB
               uses: actions/cache@v4
               with:
-                path: ~/.cache/trivy
+                path: ${{ github.workspace }}/.trivy-cache
                 key: trivy-image-db
 
             - name: Run Trivy vulnerability scanner for backend image
