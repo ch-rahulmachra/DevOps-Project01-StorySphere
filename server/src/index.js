@@ -29,7 +29,7 @@ const PORT = process.env.PORT || 5000;
 
 sequelize.authenticate()
   .then(() => {
-    console.log("✅ Connected to DB");
+    console.log("✅ Connected to DB!!!");
     return sequelize.sync({ alter: true });
   })
   .then(() => {
